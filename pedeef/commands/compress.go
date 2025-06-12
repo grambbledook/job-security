@@ -14,7 +14,7 @@ import (
 	"iter"
 	"os"
 	"path/filepath"
-	"pedeef/pedeef/asserts"
+	"pedeef/asserts"
 	"strings"
 )
 
@@ -36,6 +36,10 @@ const (
 	QualityParamName      = "quality"
 	QualityParamShortName = "q"
 	QualityParamUsage     = "Quality percentage"
+
+	CompressNoTempFileParamName      = "no-temp-file"
+	CompressNoTempFileParamShortName = "n"
+	CompressNoTempFileParamUsage     = "Don't write to temp file"
 )
 
 func NewCompressCommand() *cobra.Command {
@@ -48,6 +52,7 @@ func NewCompressCommand() *cobra.Command {
 	cmd.Flags().StringP(CompressInputParamName, CompressInputParamShortName, "", CompressInputParamUsage)
 	cmd.Flags().IntP(CompressionParamName, CompressParamShortName, 100, CompressParamUsage)
 	cmd.Flags().IntP(QualityParamName, QualityParamShortName, 75, QualityParamUsage)
+	cmd.Flags().BoolP(CompressNoTempFileParamName, CompressNoTempFileParamShortName, false, CompressNoTempFileParamUsage)
 
 	return cmd
 }
@@ -113,18 +118,25 @@ func compressPdf(cmd *cobra.Command, args []string) {
 	quality, _ := cmd.Flags().GetInt(QualityParamName)
 	asserts.NotZeru(compression, "Quality flag is required")
 
+	noTemp, err := cmd.Flags().GetBool(NoTempFileParamName)
+	asserts.NoError(err, "NoTempFile flag is required")
+
 	fmt.Printf("Compressing PDF file [%s]...\n", in)
 	fmt.Printf("   Into [%s]...\n", out)
 	fmt.Printf("   Compression [%d]...\n", compression)
 	fmt.Printf("   JPEG Quality [%d]...\n", quality)
 
-	tempFile, err := tempFile(out)
-	asserts.NoError(err, "Error creating temporary file")
-	defer os.Remove(tempFile.Name())
+	file := out
+	if !noTemp {
+		tempFile, err := tempFile(out)
+		asserts.NoError(err, "Error creating temporary file")
+		defer os.Remove(tempFile.Name())
 
-	process(in, tempFile.Name(), compression, quality)
+		file = tempFile.Name()
+	}
+	process(in, file, compression, quality)
 
-	err = os.Rename(tempFile.Name(), out)
+	err = os.Rename(file, out)
 	asserts.NoError(err, "Failed moving tmp file to a final destination")
 
 	fmt.Printf("Successfully compressd files into %s\n", out)

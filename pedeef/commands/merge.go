@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"os"
 	"path/filepath"
-	"pedeef/pedeef/asserts"
+	"pedeef/asserts"
 	"strings"
 )
 
@@ -26,6 +26,10 @@ const (
 	MergeDirectoryParamName      = "directory"
 	MergeDirectoryParamShortName = "d"
 	MergeDirectoryParamUsage     = "Directory with PDF files to merge"
+
+	NoTempFileParamName      = "no-temp-file"
+	NoTempFileParamShortName = "n"
+	NoTempFileParamUsage     = "Don't write to temp file"
 )
 
 var (
@@ -43,6 +47,7 @@ func NewMergeCommand() *cobra.Command {
 	cmd.Flags().StringP(MergeOutputParamName, MergeOutputParamShortName, "", MergeOutputParamUsage)
 	cmd.Flags().StringArrayP(MergeInputParamName, MergeInputParamShortName, nil, MergeInputParamUsage)
 	cmd.Flags().StringP(MergeDirectoryParamName, MergeDirectoryParamShortName, "", MergeDirectoryParamUsage)
+	cmd.Flags().BoolP(NoTempFileParamName, NoTempFileParamShortName, false, NoTempFileParamUsage)
 
 	return cmd
 }
@@ -58,23 +63,30 @@ func mergePdf(cmd *cobra.Command, args []string) {
 	dir, err := cmd.Flags().GetString(MergeDirectoryParamName)
 	asserts.NoError(err, "Directory flag is required")
 
+	noTemp, err := cmd.Flags().GetBool(NoTempFileParamName)
+	asserts.NoError(err, "NoTempFile flag is required")
+
 	files, err := getListOfFiles(in, dir)
 	asserts.NoError(err, "Problem creating a list of files")
 
 	fmt.Printf("Merging PDF files [%s]...\n", in)
 	fmt.Printf("   Into [%s]...\n", out)
 
-	tempFile, err := tempFile(out)
-	asserts.NoError(err, "Error creating temporary file")
-	defer os.Remove(tempFile.Name())
+	file := out
+	if !noTemp {
+		tempFile, err := tempFile(out)
+		asserts.NoError(err, "Error creating temporary file")
+		defer os.Remove(tempFile.Name())
+		file = tempFile.Name()
+	}
 
 	config := model.NewDefaultConfiguration()
 	config.Optimize = true
 
-	err = api.MergeCreateFile(files, tempFile.Name(), false, config)
+	err = api.MergeCreateFile(files, file, false, config)
 	asserts.NoError(err, "Merge failed")
 
-	err = os.Rename(tempFile.Name(), out)
+	err = os.Rename(file, out)
 	asserts.NoError(err, "Failed moving tmp file to a final destination")
 
 	fmt.Printf("Successfully merged files into %s\n", out)

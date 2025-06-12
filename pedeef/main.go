@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"os"
-	commands2 "pedeef/pedeef/commands"
+	commands2 "pedeef/commands"
 )
 
 var cmd = initCommand()
